@@ -1,3 +1,4 @@
+from datetime import datetime
 
 def loadCredential():
     try:
@@ -18,3 +19,28 @@ def loadCredential():
         raise ImportError("No entries in credentials file")
     return credentials
 
+# Return True if usr is blocked
+# False if not blocked
+def usrBlocked(usr, blockedList):
+    currTime = datetime.now()
+    if usr in blockedList:
+        usrTime = blockedList[usr]
+        diff = currTime - usrTime
+        if abs(diff.seconds) > 10:
+            blockedList.pop(usr)
+            return False 
+        else:
+            return True
+    return False
+
+def usrLogin(usr, passwrd):
+    creds = loadCredential()
+    if usr in creds:
+        if creds[usr] == passwrd:
+            return True
+        
+    return False
+
+def blockUser(usr, blockedList):
+    blockedList[usr] = datetime.now()
+    return blockedList

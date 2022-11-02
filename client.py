@@ -4,7 +4,9 @@ from socket import *
 import sys
 
 
-def client():
+
+
+def client(serverHost, serverPort):
     serverAddress = (serverHost, serverPort)
 
     # define a socket for the client side, it would be used to communicate with the server
@@ -13,24 +15,28 @@ def client():
     # build connection with the server and send message to it
     clientSocket.connect(serverAddress)
 
-    
-    while True:
-        clientSocket.sendall(message.encode())
+    active = True
+    while active:
+
 
         # receive response from the server
         # 1024 is a suggested packet size, you can specify it as 2048 or others
-        data = clientSocket.recv(1024)
+        data = clientSocket.recv(2048)
         receivedMessage = data.decode()
-
+        message = receivedMessage.splitlines()
         # parse the message received from server and take corresponding actions
-        if receivedMessage == "":
-            print("[recv] Message from server is empty!")
-        elif receivedMessage == "user credentials request":
+        if receivedMessage[0] == "user credentials request":
             usr = input("> Username: ")
             passwrd = input("> Password: ")
-            message
-        elif receivedMessage == "download filename":
-            print("[recv] You need to provide the file name you want to download")
+            message = f"login\nusr:{usr}\npassword:{passwrd}\n\n"
+        if receivedMessage[0] == "blocked":
+            if receivedMessage[1] == "wrong password":
+                print("Invalid Password. Your account has been blocked. Please try again later\n")
+            else:
+                print("Your account is blocked due to multiple authentication failures. Please try again later\n")
+            active = False
+            break
+                
         else:
             print("[recv] Message makes no sense")
             
@@ -50,3 +56,4 @@ if __name__ == "__main__":
     server_ip = sys.argv[1]
     server_port = int(sys.argv[2])
     client_udp_port = int(sys.argv[3])
+    client
