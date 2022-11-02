@@ -23,7 +23,6 @@ clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect(serverAddress)
 
 while True:
-    message = input("===== Please type any messsage you want to send to server: =====\n")
     clientSocket.sendall(message.encode())
 
     # receive response from the server
@@ -35,7 +34,9 @@ while True:
     if receivedMessage == "":
         print("[recv] Message from server is empty!")
     elif receivedMessage == "user credentials request":
-        print("[recv] You need to provide username and password to login")
+        usr = input("> Username: ")
+        passwrd = input("> Password: ")
+        message
     elif receivedMessage == "download filename":
         print("[recv] You need to provide the file name you want to download")
     else:

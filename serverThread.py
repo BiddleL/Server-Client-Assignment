@@ -2,19 +2,24 @@ from threading import Thread
 import sys, select
 from socket import *
 
+from helper import loadCredential
+
+
+
 class ClientThread(Thread):
-    def __init__(self, clientAddress, clientSocket):
+    def __init__(self, clientAddress, clientSocket, num_attempts):
         Thread.__init__(self)
         self.clientAddress = clientAddress
         self.clientSocket = clientSocket
-        self.clientAlive = False
-        
-        print("===== New connection created for: ", clientAddress)
         self.clientAlive = True
-        
+        self.num_attempts = num_attempts
+        self.login_status = False
+        self.credentials = loadCredential()
+
     def run(self):
         message = ''
-        
+        self.cred_request()
+
         while self.clientAlive:
             # use recv() to receive message from the client
             data = self.clientSocket.recv(1024)
@@ -41,14 +46,7 @@ class ClientThread(Thread):
                 message = 'Cannot understand this message'
                 self.clientSocket.send(message.encode())
     
-    """
-        You can create more customized APIs here, e.g., logic for processing user authentication
-        Each api can be used to handle one specific function, for example:
-        def process_login(self):
-            message = 'user credentials request'
-            self.clientSocket.send(message.encode())
-    """
-    def process_login(self):
+
+    def cred_request(self):
         message = 'user credentials request'
-        print('[send] ' + message);
         self.clientSocket.send(message.encode())

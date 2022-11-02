@@ -76,7 +76,6 @@ def fileSend(filePath, connectSoc):
 
     
     
-    
 
 
 if __name__ == "__main__":
