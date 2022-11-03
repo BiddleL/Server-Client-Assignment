@@ -5,7 +5,7 @@ from socket import *
 from helper import Commands
 
 
-def client(serverHost, serverPort):
+def client(serverHost, serverPort, udpPort):
     serverAddress = (serverHost, serverPort)
 
     # define a socket for the client side, it would be used to communicate with the server
@@ -24,9 +24,7 @@ def client(serverHost, serverPort):
         header = receivedMessage[0]
         if header == "user credentials request":
             login_status = False
-            usr = input("> Username: ")
-            passwrd = input("> Password: ")
-            message = f"login\nusr:{usr}\npassword:{passwrd}\n\n"
+            login(udpPort)
             clientSocket.send(message.encode)
         elif header == "blocked":
             login_status = False
@@ -41,9 +39,7 @@ def client(serverHost, serverPort):
         elif header == "wrong password":
             login_status = False
             print("> Invalid Password. Please try again\n")
-            usr = input("> Username: ")
-            passwrd = input("> Password: ")
-            message = f"login\nusr:{usr}\npassword:{passwrd}\n\n"
+            message = login(udpPort)
             clientSocket.send(message.encode)
         elif header == "login success" or login_status:
             login_status = True
@@ -86,6 +82,13 @@ def client(serverHost, serverPort):
     # close the socket
     clientSocket.close()
 
+def login(port):
+    usr = input("> Username: ")
+    passwrd = input("> Password: ")
+    message = f"login\nusr:{usr}\npassword:{passwrd}\nudp:{port}\n"
+    return message
+
+
 if __name__ == "__main__":
     if(len(sys.argv) != 4):
         print("Usage: python3 client.py server_IP server_port client_udp_port")
@@ -93,4 +96,4 @@ if __name__ == "__main__":
     server_ip = sys.argv[1]
     server_port = int(sys.argv[2])
     client_udp_port = int(sys.argv[3])
-    client
+    client(server_ip, server_port, client_udp_port)

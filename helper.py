@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+import os
 
 def loadCredential():
     try:
@@ -52,6 +53,36 @@ def usrAlreadyLoggedIn(usr, activeList):
         return True
     else: 
         return False
+
+def deleteActiveLog(usr):
+    try:
+        with open("edge-device-log.txt", 'w') as f:
+            lines = f.readlines()
+            f.close()
+    except IOError:
+        raise IOError("Error with loading active edge log file")
+
+    for i in lines:
+        lineS = i.split("; ")
+        if lineS[2] == usr:
+            lines.remove(i)
+
+    prev = 0
+    for i in range(len(lines)):
+        lineS = lines[i].split("; ")
+        index = lineS[0]
+        if index != prev + 1:
+            lines[i] = f"{prev+1};" + lines[len(index)+1:]
+        prev += 1
+    os.remove("edge-device-log.txt")
+    try:
+        with open("edge-device-log.txt", 'a') as f:
+            f.writelines(lines[:-1])
+            f.close()
+    except IOError:
+        raise IOError("Error with loading active edge log file")
+    
+
 
 class Commands(Enum):
     EDG = 1
