@@ -1,9 +1,11 @@
 from datetime import datetime
+from enum import Enum
 
 def loadCredential():
     try:
         with open("credentials.txt", 'r') as f:
             lines = f.readlines()
+            f.close()
     except IOError:
         raise IOError("Error with loading credentials file")
     
@@ -44,3 +46,18 @@ def usrLogin(usr, passwrd):
 def blockUser(usr, blockedList):
     blockedList[usr] = datetime.now()
     return blockedList
+
+def usrAlreadyLoggedIn(usr, activeList):
+    if usr in activeList:
+        return True
+    else: 
+        return False
+
+class Commands(Enum):
+    EDG = 1
+    UED = 2
+    SCS = 3
+    DTE = 4
+    AED = 5
+    OUT = 6
+    UVF = 7

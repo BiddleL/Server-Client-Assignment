@@ -1,9 +1,8 @@
 import sys
-
 from socket import *
-import sys
 
 
+from helper import Commands
 
 
 def client(serverHost, serverPort):
@@ -16,36 +15,74 @@ def client(serverHost, serverPort):
     clientSocket.connect(serverAddress)
 
     active = True
+    login_status = False
     while active:
-
-
-        # receive response from the server
-        # 1024 is a suggested packet size, you can specify it as 2048 or others
         data = clientSocket.recv(2048)
         receivedMessage = data.decode()
         message = receivedMessage.splitlines()
         # parse the message received from server and take corresponding actions
-        if receivedMessage[0] == "user credentials request":
+        header = receivedMessage[0]
+        if header == "user credentials request":
+            login_status = False
             usr = input("> Username: ")
             passwrd = input("> Password: ")
             message = f"login\nusr:{usr}\npassword:{passwrd}\n\n"
-        if receivedMessage[0] == "blocked":
+            clientSocket.send(message.encode)
+        elif header == "blocked":
+            login_status = False
             if receivedMessage[1] == "wrong password":
-                print("Invalid Password. Your account has been blocked. Please try again later\n")
+                print("> Invalid Password. Your account has been blocked. Please try again later\n")
+            if receivedMessage[1] == "login":
+                print("> This user is already logged in from another device. Please log out of that device and try again\n")
             else:
-                print("Your account is blocked due to multiple authentication failures. Please try again later\n")
+                print("> Your account is blocked due to multiple authentication failures. Please try again later\n")
             active = False
             break
-                
-        else:
-            print("[recv] Message makes no sense")
-            
-        ans = input('\nDo you want to continue(y/n) :')
-        if ans == 'y':
-            continue
-        else:
-            break
-
+        elif header == "wrong password":
+            login_status = False
+            print("> Invalid Password. Please try again\n")
+            usr = input("> Username: ")
+            passwrd = input("> Password: ")
+            message = f"login\nusr:{usr}\npassword:{passwrd}\n\n"
+            clientSocket.send(message.encode)
+        elif header == "login success" or login_status:
+            login_status = True
+            if header == "login success":
+                print("> Welcome!\n")
+            usrCommand = input("> Enter one of the following commands (EDG, UED, SCS, DTE, AED, OUT, UVF):\n")
+            commands = usrCommand.split(" ")
+            command = -1
+            try:
+                command = Commands[commands[0]].value()
+            except KeyError:
+                print("> Error. Invalid command!\n")
+            # client command behaviour
+            if command > 0 and command <= 7:
+                # EDG
+                if command == 1: 
+                    message = ""
+                # UED
+                elif command == 2:
+                    message = ""
+                # SCS
+                elif command == 3:
+                    message = ""
+                # DTE
+                elif command == 4:
+                    message = ""
+                # AED
+                elif command == 5:
+                    message = ""
+                # OUT
+                elif command == 6:
+                    active = False
+                    message = "OUT\n\n"
+                    clientSocket.sendall(message.encode())
+                    break
+                # UVF
+                elif command == 7:
+                    message = ""
+        
     # close the socket
     clientSocket.close()
 
