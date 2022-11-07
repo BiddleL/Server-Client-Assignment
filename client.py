@@ -16,21 +16,23 @@ def client(serverHost, serverPort, udpPort):
 
     active = True
     login_status = False
+    user = ""
     while active:
         data = clientSocket.recv(2048)
         receivedMessage = data.decode()
         message = receivedMessage.splitlines()
+        print(f"Incoming:{message}")
         # parse the message received from server and take corresponding actions
-        header = receivedMessage[0]
+        header = message[0]
         if header == "user credentials request":
             login_status = False
-            login(udpPort)
-            clientSocket.send(message.encode)
+            message = str(login(udpPort))
+            clientSocket.send(message.encode())
         elif header == "blocked":
             login_status = False
-            if receivedMessage[1] == "wrong password":
+            if message[1] == "wrong password":
                 print("> Invalid Password. Your account has been blocked. Please try again later\n")
-            if receivedMessage[1] == "login":
+            elif message[1] == "login":
                 print("> This user is already logged in from another device. Please log out of that device and try again\n")
             else:
                 print("> Your account is blocked due to multiple authentication failures. Please try again later\n")
@@ -40,16 +42,17 @@ def client(serverHost, serverPort, udpPort):
             login_status = False
             print("> Invalid Password. Please try again\n")
             message = login(udpPort)
-            clientSocket.send(message.encode)
+            clientSocket.send(message.encode())
         elif header == "login success" or login_status:
-            login_status = True
             if header == "login success":
+                login_status = True
+                user = message[1] 
                 print("> Welcome!\n")
             usrCommand = input("> Enter one of the following commands (EDG, UED, SCS, DTE, AED, OUT, UVF):\n")
             commands = usrCommand.split(" ")
             command = -1
             try:
-                command = Commands[commands[0]].value()
+                command = Commands[commands[0]].value
             except KeyError:
                 print("> Error. Invalid command!\n")
             # client command behaviour
@@ -74,7 +77,12 @@ def client(serverHost, serverPort, udpPort):
                     active = False
                     message = "OUT\n\n"
                     clientSocket.sendall(message.encode())
-                    break
+                    data = clientSocket.recv(2048)
+                    receivedMessage = data.decode()
+                    if message == receivedMessage:
+                        # OUT confirmed
+                        print(f"\n> Bye, {user}!\n")
+                        break
                 # UVF
                 elif command == 7:
                     message = ""
@@ -83,7 +91,9 @@ def client(serverHost, serverPort, udpPort):
     clientSocket.close()
 
 def login(port):
+    print('\n')
     usr = input("> Username: ")
+    print('\n')
     passwrd = input("> Password: ")
     message = f"login\nusr:{usr}\npassword:{passwrd}\nudp:{port}\n"
     return message
