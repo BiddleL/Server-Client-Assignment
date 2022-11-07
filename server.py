@@ -11,7 +11,17 @@ usrActiveList = [] # list of active usernames
 numSuccessful = 0
 
 def TCPserver(port, attempts):
-    return True
+    serverHost = "127.0.0.1"
+    serverAddress = (serverHost, port)
+    serverSocket = socket(AF_INET, SOCK_STREAM)
+    serverSocket.bind(serverAddress)
+    serverSocket = socket(AF_INET, SOCK_STREAM)
+    serverSocket.bind(serverAddress)
+    while True:
+        serverSocket.listen()
+        clientSockt, clientAddress = serverSocket.accept()
+        clientThread = ClientThread(clientAddress, clientSockt)
+        clientThread.start()
 
 def UDPserver():
     return False
@@ -148,5 +158,4 @@ if __name__ == "__main__":
         raise SystemError("Usage: python3 server.py server_port number_of_consecutive_failed_attempts") 
     tcp_port = int(sys.argv[1])
     num_attempts = int(sys.argv[2])
-    
     TCPserver(tcp_port, num_attempts)
