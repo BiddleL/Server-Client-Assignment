@@ -4,8 +4,8 @@ import sys, select
 from socket import *
 from datetime import datetime
 
-from helper import loadCredential, usrBlocked, usrLogin, blockUser, usrAlreadyLoggedIn
-from helper import Commands
+import sHelper
+from Commands import Commands
 
 usersBlocked = dict() # key = username, value = blocked time
 usrActiveList = [] # list of active usernames 
@@ -46,24 +46,24 @@ class ClientThread(Thread):
     # Single server thread
     def run(self):
         print(f"Starting client thread on {self.clientAddress}")
-        message = self.cred_request()
+        message = "user credentials request\n\n"
         self.clientSocket.send(message.encode())
         while self.clientAlive:
             # use recv() to receive message from the client
-            data = self.clientSocket.recv(2048)
+            data = self.clientSocket.recv(sHelper.BUFFER_SIZE)
             if data == b'':
                 self.clientAlive = False
                 break
-            message = data.decode()
-            message_decoded = message.splitlines()
+            message_decoded = data.decode()
+            message = message_decoded.splitlines()
             
-            header = message_decoded[0]
+            header = message[0]
             try:
                 command = Commands[header].value
                 command_flag = True
             except KeyError:
                 command_flag = False
-            print(f"Incoming: {message_decoded}")
+            print(f"Incoming: {message}")
             if command_flag:
                 if command > 0 and command <= 7:
                     # EDG
@@ -71,21 +71,27 @@ class ClientThread(Thread):
                         message = ""
                     # UED
                     elif command == 2:
-                        message = ""
+                        response = "UED\n\n"
+                        self.clientSocket.sendall(response.encode())
+                        print(f"> Edge device {self.currUser} issued UED command\n")
+                        response = sHelper.uedR(self)
+                        self.clientSocket.sendall(response)
+
                     # SCS
                     elif command == 3:
                         message = ""
                     # DTE
                     elif command == 4:
-                        message = ""
+                        response = sHelper.dteDelete(message, self.currUser) 
+                        self.clientSocket.sendall(response.encode())
                     # AED
                     elif command == 5:
                         message = ""
                     # OUT
                     elif command == 6:
                         self.clientAlive = False
-                        message = "OUT\n\n"
-                        self.clientSocket.sendall(message.encode())
+                        response = "OUT\n\n"
+                        self.clientSocket.sendall(response.encode())
                         break
                     # UVF
                     elif command == 7:
@@ -93,9 +99,9 @@ class ClientThread(Thread):
                         
             else:
                 if header == 'login':
-                    usrS = message_decoded[1].split(':')
-                    passwrdS = message_decoded[2].split(':')
-                    portS = message_decoded[3].split(':')
+                    usrS = message[1].split(':')
+                    passwrdS = message[2].split(':')
+                    portS = message[3].split(':')
                     if usrS[0] == "usr" and passwrdS[0] == "password" and portS[0] == "udp":
                         usr = usrS[1]
                         passwrd = passwrdS[1]
@@ -105,45 +111,14 @@ class ClientThread(Thread):
         if self.loginStatus:
             self.logout()
         print(f"Closing client thread on {self.clientAddress}")
-        
-            
-    # Request credentials from client
-    def cred_request(self):
-        message = "user credentials request\n\n"
-        return message 
-    # Write client info to log after successful join
-    def write_active_log(self):
-        i = 0
-        try:
-            with open("edge-device-log.txt", 'r') as f:
-                file = f.readlines()
-                i = len(file)
-                f.close()
-        except IOError:
-            i = 1
-
-        line = ""
-        now = self.joinTime.strftime("%d %B %Y %H:%M:%S")
-        line += now + "; "
-        line += f"{self.currUser}; "
-        line += f"{self.clientAddress}; "
-        line += f"{self.udpSocket}\n"
-        line = f"{i} " + line
-        
-        try:
-            with open("edge-device-log.txt", 'a+') as f:
-                f.write(line)
-                f.close()
-        except IOError:
-            raise IOError("Error with loading edge log file")
     
     # Processing authentication
     def process_login(self, usr, passwrd, port):
-        login_status = usrLogin(usr, passwrd)
+        login_status = sHelper.usrLogin(usr, passwrd)
         global usersBlocked
-        blockedStatus = usrBlocked(usr, usersBlocked)
+        blockedStatus = sHelper.usrBlocked(usr, usersBlocked)
         global usrActiveList
-        alreadyLogged = usrAlreadyLoggedIn(usr, usrActiveList)
+        alreadyLogged = sHelper.usrAlreadyLoggedIn(usr, usrActiveList)
         if blockedStatus:
             message = "blocked\n\n"
             return message
@@ -151,7 +126,7 @@ class ClientThread(Thread):
             message = "wrong password\n"
             self.numAttempts += 1
             if(self.numAttempts >= self.MAX_ATTEMPTS):
-                usersBlocked = blockUser(usr, usersBlocked)
+                usersBlocked = sHelper.blockUser(usr, usersBlocked)
                 message = "blocked\n" + message
             message += '\n'
             return message
@@ -169,45 +144,15 @@ class ClientThread(Thread):
             global numSuccessful 
             numSuccessful += 1
             
-            self.write_active_log()
+            sHelper.writeActiveLog(self)
             message = f"login success\n{self.currUser}\n\n"
             return message
     
-    def remove_active_log(self):
-        newfile = ""
-        try:
-            with open("edge-device-log.txt", 'r') as f:
-                file = f.readlines()
-                flag = False
-                l = len(file)
-                if l > 1:
-                    for i in range(l):
-                        s = file[i].split("; ")
-                        username = s[2]
-                        if username == self.currUser and flag == False:
-                            index = i + 1
-                            flag = True
-                        elif flag:
-                            s[0] = str(index)
-                            index += 1
-                            newfile += "; ".join(s) + '\n'
-                        else:
-                            newfile += file[i] + '\n'
-                f.close()      
-        except IOError:
-            raise IOError("Error with loading edge log file")
-        os.remove("edge-device-log.txt")
-        try:
-            with open("edge-device-log.txt", 'w') as f:
-                f.write(newfile)
-                f.close()
-        except IOError:
-            raise IOError("Error with creating edge log file")
-
+    # Perform cleanup and log client out
     def logout(self):
         global usrActiveList
         usrActiveList.remove(self.currUser)
-        self.remove_active_log()
+        sHelper.removeActiveLog(self)
         self.clientSocket.close()
         self.loginStatus = False
         print(f"\n{self.currUser} exited the edge network\n")

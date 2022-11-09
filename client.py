@@ -1,8 +1,9 @@
 import sys
+import os
 from socket import *
 
-
-from helper import Commands
+import cHelper
+from Commands import Commands
 
 
 def client(serverHost, serverPort, udpPort):
@@ -14,11 +15,11 @@ def client(serverHost, serverPort, udpPort):
     # build connection with the server and send message to it
     clientSocket.connect(serverAddress)
 
-    active = True
+    outside_active = True
     login_status = False
     user = ""
-    while active:
-        data = clientSocket.recv(2048)
+    while outside_active:
+        data = clientSocket.recv(cHelper.BUFFER_SIZE)
         receivedMessage = data.decode()
         message = receivedMessage.splitlines()
         print(f"Incoming:{message}")
@@ -46,46 +47,90 @@ def client(serverHost, serverPort, udpPort):
         elif header == "login success" or login_status:
             if header == "login success":
                 login_status = True
+                outside_active = False
                 user = message[1] 
                 print("> Welcome!\n")
-            usrCommand = input("> Enter one of the following commands (EDG, UED, SCS, DTE, AED, OUT, UVF):\n")
-            commands = usrCommand.split(" ")
-            command = -1
-            try:
-                command = Commands[commands[0]].value
-            except KeyError:
-                print("> Error. Invalid command!\n")
-            # client command behaviour
-            if command > 0 and command <= 7:
-                # EDG
-                if command == 1: 
-                    message = ""
-                # UED
-                elif command == 2:
-                    message = ""
-                # SCS
-                elif command == 3:
-                    message = ""
-                # DTE
-                elif command == 4:
-                    message = ""
-                # AED
-                elif command == 5:
-                    message = ""
-                # OUT
-                elif command == 6:
-                    active = False
-                    message = "OUT\n\n"
-                    clientSocket.sendall(message.encode())
-                    data = clientSocket.recv(2048)
-                    receivedMessage = data.decode()
-                    if message == receivedMessage:
-                        # OUT confirmed
-                        print(f"\n> Bye, {user}!\n")
-                        break
-                # UVF
-                elif command == 7:
-                    message = ""
+    
+    while login_status:
+        usrCommand = input("> Enter one of the following commands (EDG, UED, SCS, DTE, AED, OUT, UVF):\n")
+        commands = usrCommand.split(" ")
+        command = -1
+        try:
+            command = Commands[commands[0]].value
+        except KeyError:
+            print("> Error. Invalid command!\n")
+        # client command behaviour
+        if command > 0 and command <= 7:
+            # EDG
+            if command == 1: 
+                try:
+                    fileID = commands[1]
+                    size = commands[2]
+                except IndexError:
+                    print("> EDG command requires fileID and dataAmount as arguments\n")
+                cHelper.edg(fileID, size, user)
+                
+            # UED
+            elif command == 2:
+                message = "UED\n\n"
+                clientSocket.sendall(message.encode())
+                data = clientSocket.recv(cHelper.BUFFER_SIZE)
+                header = data.decode().splitlines()[0]
+                if header == "UED":
+                    message = None
+                    
+                    try:
+                        fileID = commands[1]
+                        fileIDi = int(fileID)
+                        message = cHelper.ued(fileID, user)
+                    except IndexError:
+                        print("> UED command requires fileID as an argument\n")
+                    except ValueError:
+                        print("> UED command requires fileID as an integer\n")
+                    
+                    if message != None:
+                        clientSocket.sendall(message)
+                        data = clientSocket.recv(cHelper.BUFFER_SIZE)
+                        message = data.decode().splitlines()
+                        header = message[0]
+                        if header == "UED":
+                            if "success" in message:
+                                if "exist" in message:
+                                    print(f"> Data file with ID of {fileID} has been replaced on server\n")
+                                else:
+                                    print(f"> Data file with ID of {fileID} has been uploaded to server\n")
+
+            # SCS
+            elif command == 3:
+                message = ""
+            # DTE
+            elif command == 4:
+                try:
+                    fileID = commands[1]
+                except IndexError:
+                    print("> DTE command requires fileID as an argument\n")
+                message = cHelper.dteS(fileID, size, user)
+                clientSocket.sendall(message.encode())
+                data = clientSocket.recv(cHelper.BUFFER_SIZE)
+                cHelper.dteR(data)
+
+            # AED
+            elif command == 5:
+                message = ""
+            # OUT
+            elif command == 6:
+                message = "OUT\n\n"
+                clientSocket.sendall(message.encode())
+                data = clientSocket.recv(cHelper.BUFFER_SIZE)
+                receivedMessage = data.decode()
+                login_status = False
+                if message == receivedMessage:
+                    # OUT confirmed
+                    print(f"\n> Bye, {user}!\n")
+                    break
+            # UVF
+            elif command == 7:
+                message = ""
         
     # close the socket
     clientSocket.close()
