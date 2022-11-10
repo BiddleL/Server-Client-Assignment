@@ -283,7 +283,7 @@ def scs(id, usr, oper):
             response += f"{min(data)}\n\n"
         elif oper == "SUM":
             response += f"{sum(data)}\n\n"
-        elif oper == "AVG":
+        elif oper == "AVERAGE":
             response += f"{mean(data)}\n\n"
         else:
             response += "error\n\n"

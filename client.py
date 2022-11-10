@@ -104,7 +104,25 @@ def client(serverHost, serverPort, udpPort):
                     clientSocket.sendall(message.encode())
             # SCS
             elif command == 3:
-                message = ""
+                try:
+                    fileID = int(commands[1])
+                    oper = commands[2]
+                    message = f"SCS\n{fileID}\n{oper}\n\n"
+                    clientSocket.sendall(message.encode())
+                    data = clientSocket.recv(cHelper.BUFFER_SIZE)
+                    response = data.splitlines()
+                    header = response[1]
+                    if header == "error":
+                        print(f"> {oper} is an invalid computationOperation (MAX, MIN, SUM, AVERAGE")
+                    elif header == "no-exist":
+                        print(f"> File with ID of {fileID} doesn't exist on the server")
+                    elif header == "packet-error":
+                        print(f"> Error with SCS packet structure")
+                    else:
+                        value = response[2]
+                        print(f"> Computation ({oper}) on the file with ID of {fileID} has been returned as {value}")
+                except:
+                    print("> SCS command requires fileId and computationOperation as arguements")
             # DTE
             elif command == 4:
                 try:
