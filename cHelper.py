@@ -1,4 +1,5 @@
 import os
+from socket import socket
 
 BUFFER_SIZE = 2048
 
@@ -38,6 +39,7 @@ def dteS(fileID):
 def dteR(data):
     message = data.decode().splitlines()
     header = message[0]
+
     if header == "DTE":
         body = message[1]
         if body == "non-exist":
@@ -56,12 +58,8 @@ def ued(fileID, user):
         message = f"UED\n{fileID}\nSTART\n"
         try:
             with open(filename, 'r') as f:
-                while True:
-                    buffer = 1024 
-                    fIn = f.read(buffer)
-                    if fIn == 0:
-                        break
-                    message += fIn
+                for line in f:
+                    message += f"{line}\n"
                 message += "END\n\n"
         except:
             print("> UED: File loading error\n")
@@ -75,5 +73,13 @@ def ued(fileID, user):
 def uedR(data):
     message = data.decode().splitlines()
     
-
+def recvall(s: socket):
+    data = b''
+    while True:
+        part = s.recv(BUFFER_SIZE)
+        data += part
+        if len(part) < BUFFER_SIZE:
+            # either 0 or end of data
+            break
+    return data
 

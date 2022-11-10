@@ -10,6 +10,7 @@ from Commands import Commands
 usersBlocked = dict() # key = username, value = blocked time
 usrActiveList = [] # list of active usernames 
 numSuccessful = 0
+clients = []
 
 def TCPserver(port, attempts):
     serverHost = "localhost"
@@ -19,10 +20,14 @@ def TCPserver(port, attempts):
     serverSocket = socket(AF_INET, SOCK_STREAM)
     serverSocket.bind(serverAddress)
     print(f"Server started {serverHost}:{port}")
+    # console = Console()
+    # console.start()
     while True:
         serverSocket.listen()
         clientSockt, clientAddress = serverSocket.accept()
         clientThread = ClientThread(clientAddress, clientSockt, attempts)
+        global clients
+        clients.append(clientThread)
         clientThread.start()
 
 
@@ -71,22 +76,35 @@ class ClientThread(Thread):
                         message = ""
                     # UED
                     elif command == 2:
-                        response = "UED\n\n"
-                        self.clientSocket.sendall(response.encode())
-                        print(f"> Edge device {self.currUser} issued UED command\n")
-                        response = sHelper.uedR(self)
-                        self.clientSocket.sendall(response)
+                        if message[1] != "fail":
+                            response = "UED\n\n"
+                            self.clientSocket.sendall(response.encode())
+                            print(f"> Edge device {self.currUser} issued UED command\n")
+                            response = sHelper.uedR(self)
+                            print(response)
+                            if response != None:
+                                self.clientSocket.sendall(response.encode())
 
                     # SCS
                     elif command == 3:
-                        message = ""
+                        try:
+                            fileID = message[1]
+                            operation = message[2]
+                            response = sHelper.scs(fileID, usr, operation)
+                            self.clientSocket.sendall(response.encode())
+                        except:
+                            print("> Incorrect SCS structure")
+                            self.clientSocket.sendall("SCS\npacket-error\n\n".encode())
+
                     # DTE
                     elif command == 4:
                         response = sHelper.dteDelete(message, self.currUser) 
                         self.clientSocket.sendall(response.encode())
                     # AED
                     elif command == 5:
-                        message = ""
+                        response = sHelper.aed(self)
+                        self.clientSocket.sendall(response.encode())
+
                     # OUT
                     elif command == 6:
                         self.clientAlive = False
@@ -155,7 +173,24 @@ class ClientThread(Thread):
         sHelper.removeActiveLog(self)
         self.clientSocket.close()
         self.loginStatus = False
+        global clients
+        clients.remove(self)
         print(f"\n{self.currUser} exited the edge network\n")
+
+# class Console(Thread):
+#     def __init__(self):
+#         Thread.__init__(self)
+#     def run(self):
+#         i = " "
+#         while i != "":
+#             if i == "clear":
+#                 global clients
+#                 for c in clients:
+#                     c.logout()
+#                     c.stop()
+
+
+
 
 
 
@@ -168,6 +203,9 @@ if __name__ == "__main__":
     num_attempts = int(sys.argv[2])
     try:
         os.remove("edge-device-log.txt")
+        os.remove("upload-log.txt")
+        os.remove("deletion-log.txt")
+
     except:
         True
     TCPserver(tcp_port, num_attempts)

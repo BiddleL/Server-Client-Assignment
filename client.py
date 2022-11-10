@@ -22,7 +22,6 @@ def client(serverHost, serverPort, udpPort):
         data = clientSocket.recv(cHelper.BUFFER_SIZE)
         receivedMessage = data.decode()
         message = receivedMessage.splitlines()
-        print(f"Incoming:{message}")
         # parse the message received from server and take corresponding actions
         header = message[0]
         if header == "user credentials request":
@@ -32,16 +31,16 @@ def client(serverHost, serverPort, udpPort):
         elif header == "blocked":
             login_status = False
             if message[1] == "wrong password":
-                print("> Invalid Password. Your account has been blocked. Please try again later\n")
+                print("> Invalid Password. Your account has been blocked. Please try again later")
             elif message[1] == "login":
-                print("> This user is already logged in from another device. Please log out of that device and try again\n")
+                print("> This user is already logged in from another device. Please log out of that device and try again")
             else:
-                print("> Your account is blocked due to multiple authentication failures. Please try again later\n")
+                print("> Your account is blocked due to multiple authentication failures. Please try again later")
             active = False
             break
         elif header == "wrong password":
             login_status = False
-            print("> Invalid Password. Please try again\n")
+            print("> Invalid Password. Please try again")
             message = login(udpPort)
             clientSocket.send(message.encode())
         elif header == "login success" or login_status:
@@ -49,57 +48,60 @@ def client(serverHost, serverPort, udpPort):
                 login_status = True
                 outside_active = False
                 user = message[1] 
-                print("> Welcome!\n")
+                print("> Welcome!")
     
     while login_status:
-        usrCommand = input("> Enter one of the following commands (EDG, UED, SCS, DTE, AED, OUT, UVF):\n")
+        usrCommand = input("> Enter one of the following commands (EDG, UED, SCS, DTE, AED, OUT, UVF):\n> ")
         commands = usrCommand.split(" ")
         command = -1
         try:
             command = Commands[commands[0]].value
         except KeyError:
-            print("> Error. Invalid command!\n")
+            print("> Error. Invalid command!")
         # client command behaviour
         if command > 0 and command <= 7:
             # EDG
             if command == 1: 
                 try:
-                    fileID = commands[1]
-                    size = commands[2]
+                    fileID = int(commands[1])
+                    size = int(commands[2])
+                    cHelper.edg(fileID, size, user)
                 except IndexError:
-                    print("> EDG command requires fileID and dataAmount as arguments\n")
-                cHelper.edg(fileID, size, user)
+                    print("> EDG command requires fileID and dataAmount as arguments")
+                
                 
             # UED
             elif command == 2:
-                message = "UED\n\n"
-                clientSocket.sendall(message.encode())
-                data = clientSocket.recv(cHelper.BUFFER_SIZE)
-                header = data.decode().splitlines()[0]
-                if header == "UED":
-                    message = None
-                    
-                    try:
-                        fileID = commands[1]
-                        fileIDi = int(fileID)
-                        message = cHelper.ued(fileID, user)
-                    except IndexError:
-                        print("> UED command requires fileID as an argument\n")
-                    except ValueError:
-                        print("> UED command requires fileID as an integer\n")
-                    
-                    if message != None:
-                        clientSocket.sendall(message)
-                        data = clientSocket.recv(cHelper.BUFFER_SIZE)
-                        message = data.decode().splitlines()
-                        header = message[0]
-                        if header == "UED":
-                            if "success" in message:
-                                if "exist" in message:
-                                    print(f"> Data file with ID of {fileID} has been replaced on server\n")
-                                else:
-                                    print(f"> Data file with ID of {fileID} has been uploaded to server\n")
-
+                flag = True
+                message = None
+                try:
+                    fileID = commands[1]
+                    fileIDi = int(fileID)
+                    message = "UED\n\n"
+                    clientSocket.sendall(message.encode())
+                    data = clientSocket.recv(cHelper.BUFFER_SIZE)
+                    header = data.decode().splitlines()[0]
+                    message = cHelper.ued(fileID, user)
+                except IndexError:
+                    flag = False
+                    print("> UED command requires fileID as an argument\n")
+                except ValueError:
+                    flag = False
+                    print("> UED command requires fileID as an integer\n")
+                if message != None and flag:
+                    clientSocket.sendall(message.encode())
+                    data = clientSocket.recv(cHelper.BUFFER_SIZE)
+                    message = data.decode().splitlines()
+                    header = message[0]
+                    if header == "UED":
+                        if "success" in message:
+                            if "exist" in message:
+                                print(f"> Data file with ID of {fileID} has been replaced on server\n")
+                            else:
+                                print(f"> Data file with ID of {fileID} has been uploaded to server\n")
+                else:
+                    message = "UED\nfail\n\n"
+                    clientSocket.sendall(message.encode())
             # SCS
             elif command == 3:
                 message = ""
@@ -107,16 +109,34 @@ def client(serverHost, serverPort, udpPort):
             elif command == 4:
                 try:
                     fileID = commands[1]
+                    message = cHelper.dteS(fileID)
                 except IndexError:
                     print("> DTE command requires fileID as an argument\n")
-                message = cHelper.dteS(fileID, size, user)
+                
                 clientSocket.sendall(message.encode())
                 data = clientSocket.recv(cHelper.BUFFER_SIZE)
                 cHelper.dteR(data)
 
             # AED
             elif command == 5:
-                message = ""
+                message = "AED\n\n"
+                clientSocket.sendall(message.encode())
+                data = cHelper.recvall(clientSocket).decode()
+                response = data.split("\n")
+                if response[1] == "None":
+                    print("> This client is the only user")
+                else:
+                    print("> Current active users: ")
+                    for l in response[1:]:
+                        fields = l.split("; ")
+                        name = fields[0]
+                        time = fields[1]
+                        ip = fields[2]
+                        port = fields[3]
+                        
+                        print(f"{name} active since {time} on {ip} with UDP port {port}\n")
+
+
             # OUT
             elif command == 6:
                 message = "OUT\n\n"
@@ -138,7 +158,6 @@ def client(serverHost, serverPort, udpPort):
 def login(port):
     print('\n')
     usr = input("> Username: ")
-    print('\n')
     passwrd = input("> Password: ")
     message = f"login\nusr:{usr}\npassword:{passwrd}\nudp:{port}\n"
     return message

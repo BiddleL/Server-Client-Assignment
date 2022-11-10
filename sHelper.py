@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+from statistics import mean
 
 BUFFER_SIZE = 2048
 
@@ -51,7 +52,6 @@ def usrBlocked(usr, blockedList):
 
 def usrLogin(usr, passwrd):
     creds = loadCredential()
-    print(creds)
     if usr in creds:
         if creds[usr] == passwrd:
             return True
@@ -155,7 +155,7 @@ def dteDelete(message, user):
 
     message = "DTE\n"
     print(f"> Edge device {user} issued DTE command, the file ID is {fileID}\n")
-    filename = f"{user}-{fileID}"
+    filename = f"{user}-{fileID}.txt"
     if os.path.exists(filename):
         length = 0
         with open(filename, 'r') as f:
@@ -163,7 +163,6 @@ def dteDelete(message, user):
             for l in lines:
                 length += 1
             f.close()
-        message = ""
         try:
             os.remove(filename)
             message += f"success\n{fileID}\n\n"
@@ -183,31 +182,36 @@ def uedR(thread: ClientThread):
     response = ""
     existFlag = False
     if header[0] == "UED":
-        print(f"A data file is received from edge device {thread.currUser}\n")
-        fileID = header[1]
-        usr = thread.currUser
-        filename = f"{usr}-{fileID}.txt"
-        if os.path.exists(filename):
-            os.remove(filename)
-            existFlag = True
-        sFlag = False
-        success = False
-        length = 0
-        try:
-            with open(filename, "w") as f:
-                for l in header:
-                    if l == "START":
-                        sFlag = True
-                    if l == "END":
-                        break
-                    if sFlag:
-                        f.write(f"{l}\n")
-                        length += 1
-                f.close()
-                success = True
-        except IOError:
-            print(f"> Error creating file: {filename}\n")
-            response = "error"
+        if header[1] != "fail":
+            print(f"> A data file is received from edge device {thread.currUser}\n")
+            fileID = header[1]
+            usr = thread.currUser
+            filename = f"{usr}-{fileID}.txt"
+            if os.path.exists(filename):
+                os.remove(filename)
+                existFlag = True
+            sFlag = False
+            success = False
+            length = 0
+            try:
+                with open(filename, "w") as f:
+                    for l in header:
+                        if l == "START":
+                            sFlag = True
+                        if l == "END":
+                            break
+                        if sFlag:
+                            f.write(f"{l}\n")
+                            length += 1
+                    f.close()
+                    success = True
+            except IOError:
+                print(f"> Error creating file: {filename}\n")
+                response = "error"
+        else:
+            success = False
+            response = None
+            
 
         if success:
             response = "UED\nsuccess\n"
@@ -216,7 +220,7 @@ def uedR(thread: ClientThread):
             response = "\n"
             uploadLog(thread.currUser, fileID, length)
             print(f"> The file with ID of {fileID} has been received from {thread.currUser}, upload-log.txt has been updated\n")
-            
+
         return response
   
 def readActiveLog(currentUser):
@@ -232,26 +236,58 @@ def readActiveLog(currentUser):
     for d in file:
         l = d.split("; ")
         entry = dict()
-        entry["time"] = l[1]
-        entry["usr"] = l[2]
-        entry["ip"] = l[3]
-        entry["udp-port"] = l[4]
+        entry["time"] = l[0]
+        entry["usr"] = l[1]
+        entry["ip"] = l[2]
+        entry["udp-port"] = l[3]
         if entry["usr"] != currentUser:
             devices.append(entry)
     return devices
         
 def aed(thread: ClientThread):
     usrs = readActiveLog(thread.currUser)
-    response = ""
+    response = "AED\n"
     print(f"> Edge device {thread.currUser} issued AED command\n")
+    message = ""
+    reponse = ""
     for u in usrs:
         name = u["usr"]
         ip = u["ip"]
         time = u["time"]
-        response += f"{name}; {time}; {ip}\n"
+        port = u["udp-port"]
+        response += f"{name}; {time}; {ip}; {port}\n"
         
-        message = f"{name}, active since {time}"
-    
-    for u in 
+        message += f"{name}, active since {time} on {ip} with UDP port: {port}\n"
+    if len(usrs) <= 1:
+        response = "AED\nNone\n\n"
+    else:
+        print(f"> Return message: {message}")
+        response += '\n'
+    return response 
 
+def readData(fileName):
+    data = []
+    with open(fileName, 'r') as f:
+        for l in f.readlines():
+            data.append(float(l))
+    return data
+
+def scs(id, usr, oper):
+    filename = f"{usr}-{id}.txt"
+    if os.path.exists(filename):
+        data = readData(filename)
+        response = f"SCS\n{oper}\n"
+        if oper == "MAX":
+            response += f"{max(data)}\n\n"
+        elif oper == "MIN":
+            response += f"{min(data)}\n\n"
+        elif oper == "SUM":
+            response += f"{sum(data)}\n\n"
+        elif oper == "AVG":
+            response += f"{mean(data)}\n\n"
+        else:
+            response += "error\n\n"
+        return response
+    else:
+        return "SCS\nno-exist\n\n"
 
