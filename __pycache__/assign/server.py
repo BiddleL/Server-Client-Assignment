@@ -30,6 +30,10 @@ def TCPserver(ip, port, attempts):
         clients.append(clientThread)
         clientThread.start()
 
+
+def UDPserver():
+    return False
+
 class ClientThread(Thread):
     def __init__(self, clientAddress, clientSocket, m_num_attempts):
         Thread.__init__(self)
